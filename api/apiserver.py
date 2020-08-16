@@ -8,7 +8,7 @@ import tornado.web
 import logging
 import binascii
 import unirest
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import copy
 import json
 import time
@@ -32,7 +32,7 @@ try:
     with open( '../config.yaml', 'r' ) as f:
         settings = yaml.safe_load( f )
 except IOError:
-    print "Error reading config.yaml, have you created one? (Hint: Try running ./generate_config.py)"
+    print("Error reading config.yaml, have you created one? (Hint: Try running ./generate_config.py)")
     exit()
 
 CSRF_EXEMPT_ENDPOINTS = [ "/api/contactus", "/api/register", "/", "/api/login", "/health", "/favicon.ico", "/page_callback", "/api/record_injection" ]
@@ -155,7 +155,7 @@ def data_uri_to_file( data_uri ):
     return f
 
 def pprint( input_dict ):
-    print json.dumps(input_dict, sort_keys=True, indent=4, separators=(',', ': '))
+    print(json.dumps(input_dict, sort_keys=True, indent=4, separators=(',', ': ')))
 
 class GetXSSPayloadFiresHandler(BaseHandler):
     """
@@ -235,10 +235,10 @@ def send_email( to, subject, body, attachment_file, body_type="html" ):
         body += "<br /><img src=\"https://api." + settings["domain"] + "/" + attachment_file.encode( "utf-8" ) + "\" />" # I'm so sorry.
 
     email_data = {
-        "from": urllib.quote_plus( settings["email_from"] ),
-        "to": urllib.quote_plus( to ),
-        "subject": urllib.quote_plus( subject ),
-        body_type: urllib.quote_plus( body ),
+        "from": urllib.parse.quote_plus( settings["email_from"] ),
+        "to": urllib.parse.quote_plus( to ),
+        "subject": urllib.parse.quote_plus( subject ),
+        body_type: urllib.parse.quote_plus( body ),
     }
 
     thread = unirest.post( "https://api.mailgun.net/v3/" + settings["mailgun_sending_domain"] + "/messages",
@@ -277,7 +277,7 @@ class UserInformationHandler(BaseHandler):
         allowed_attributes = ["pgp_key", "full_name", "email", "password", "email_enabled", "chainload_uri", "page_collection_paths_list" ]
         invalid_attribute_list = []
         tmp_domain = user.domain
-        for key, value in user_data.iteritems():
+        for key, value in user_data.items():
             if key in allowed_attributes:
                 return_data = user.set_attribute( key, user_data.get( key ) )
                 if return_data != True:
@@ -337,7 +337,7 @@ class RegisterHandler(BaseHandler):
         return_dict = {}
         allowed_attributes = ["pgp_key", "full_name", "domain", "email", "password", "username", "email_enabled" ]
         invalid_attribute_list = []
-        for key, value in user_data.iteritems():
+        for key, value in user_data.items():
             if key in allowed_attributes:
                 return_data = new_user.set_attribute( key, user_data.get( key ) )
                 if return_data != True:
