@@ -228,7 +228,7 @@ def record_callback_in_database( callback_data, request_handler ):
     return injection
 
 def email_sent_callback( response ):
-    print response.body
+    print(response.body)
 
 def send_email( to, subject, body, attachment_file, body_type="html" ):
     if body_type == "html":
