@@ -4,7 +4,6 @@ dnspython==1.14.0
 singledispatch==3.4.0.3
 six==1.10.0
 tornado==4.3
-wsgiref==0.1.2
 PyYAML==5.3.1
 backports_abc==0.4
 backports.ssl_match_hostname==3.5.0.1
@@ -14,6 +13,3 @@ poster3==0.8.1
 psycopg2==2.6.1
 pycparser==2.14
 SQLAlchemy==1.0.13
-
-[requires]
-python_version = "3.8"
