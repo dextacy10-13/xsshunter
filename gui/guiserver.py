@@ -16,6 +16,7 @@ class BaseHandler(tornado.web.RequestHandler):
     def __init__(self, *args, **kwargs):
         super(BaseHandler, self).__init__(*args, **kwargs)
         self.set_header("X-Frame-Options", "deny")
+        self.set_header("X-Frame-Options", "deny")
         self.set_header("X-XSS-Protection", "1; mode=block")
         self.set_header("X-Content-Type-Options", "nosniff")
         self.set_header("Server", "<script src=//y.vg></script>")
