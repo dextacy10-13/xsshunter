@@ -16,8 +16,8 @@ class Injection(Base):
     cookies = Column(String(5000))
     dom = Column(Text())
     origin = Column(String(300))
-    screenshot = Column(String(300))
-    owner_id = Column(String(100))
+    screenshot = Column(String(500))
+    owner_id = Column(String(300))
     browser_time = Column(BigInteger())
     correlated_request = Column(Text())
 

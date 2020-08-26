@@ -8,7 +8,8 @@ import tornado.web
 import logging
 import binascii
 import unirest
-import urllib.request, urllib.parse, urllib.error
+import urllib.parse, urllib.error
+import base64
 import copy
 import json
 import time
@@ -16,6 +17,8 @@ import yaml
 import sys
 import os
 import io
+import requests
+from html_sanitizer import Sanitizer
 
 from models.initiate_database import *
 from tornado import gen
@@ -109,10 +112,10 @@ class BaseHandler(tornado.web.RequestHandler):
         if csrf_token == None:
             return True
 
-        if self.request.headers.get( 'X-CSRF-Token' ) == csrf_token:
-            return True
+        if str(self.request.headers.get( 'X-CSRF-Token' )) == csrf_token.decode('utf-8'):
+                    return True
 
-        if self.get_argument( 'csrf', False ) == csrf_token:
+        if self.get_argument( 'csrf', False ) == csrf_token.decode('utf-8'):
             return True
 
         return False
@@ -134,7 +137,9 @@ class BaseHandler(tornado.web.RequestHandler):
         }))
 
     def get_authenticated_user( self ):
-        user_id = self.get_secure_cookie( "user" )
+        user_id_encoded = self.get_secure_cookie( "user" )
+        user_id = user_id_encoded.decode('utf-8')
+
         if user_id == None:
             self.error( "You must be authenticated to perform this action!" )
         return session.query( User ).filter_by( id=user_id ).first()
@@ -188,10 +193,10 @@ class GetXSSPayloadFiresHandler(BaseHandler):
         self.write( json.dumps( return_dict ) )
 
 def upload_screenshot( base64_screenshot_data_uri ):
-    screenshot_filename = "uploads/xsshunter_screenshot_" + binascii.hexlify( os.urandom( 100 ) ) + ".png"
+    screenshot_filename = "uploads/xsshunter_screenshot_" + binascii.hexlify( os.urandom( 100 ) ).decode() + ".png"
     screenshot_file_handler = data_uri_to_file( base64_screenshot_data_uri )
     local_file_handler = open( screenshot_filename, "w" ) # Async IO http://stackoverflow.com/a/13644499/1195812
-    local_file_handler.write( screenshot_file_handler.read() )
+    local_file_handler.write( str(screenshot_file_handler.read()) )
     local_file_handler.close()
     return screenshot_filename
 
@@ -232,20 +237,23 @@ def email_sent_callback( response ):
 
 def send_email( to, subject, body, attachment_file, body_type="html" ):
     if body_type == "html":
-        body += "<br /><img src=\"https://api." + settings["domain"] + "/" + attachment_file.encode( "utf-8" ) + "\" />" # I'm so sorry.
+        body = str(body)
+        body += "<br /><img src=\"https://api." + settings["domain"] + "/" + str(attachment_file.encode('utf-8')) + "\" />" # I'm so sorry.
 
+    sanitizer = Sanitizer()
     email_data = {
-        "from": urllib.parse.quote_plus( settings["email_from"] ),
-        "to": urllib.parse.quote_plus( to ),
-        "subject": urllib.parse.quote_plus( subject ),
-        body_type: urllib.parse.quote_plus( body ),
+        "from":  "Bounty User <" + settings["email_from"] + ">" ,
+        "to":  str(to) ,
+        "subject":  sanitizer.sanitize(subject) ,
+        "html":  sanitizer.sanitize(body) ,
     }
 
-    thread = unirest.post( "https://api.mailgun.net/v3/" + settings["mailgun_sending_domain"] + "/messages",
-            headers={"Accept": "application/json"},
-            params=email_data,
-            auth=("api", settings["mailgun_api_key"] ),
-            callback=email_sent_callback)
+    request_url = "https://api.mailgun.net/v3/" + settings["mailgun_sending_domain"] + "/messages"
+    r = requests.post(request_url,auth=("api", settings["mailgun_api_key"] ), data=email_data)
+    logging.warning(email_data)
+    logging.warning(r.text)
+    logging.warning(r.headers)
+    logging.warning(r.status_code)
 
 def send_javascript_pgp_encrypted_callback_message( email_data, email ):
     return send_email( email, "[XSS Hunter] XSS Payload Message (PGP Encrypted)", email_data, False, "text" )
@@ -264,14 +272,14 @@ class UserInformationHandler(BaseHandler):
         self.logit( "User grabbed their profile information" )
         if user == None:
             return
-        self.write( json.dumps( user.get_user_blob() ) )
+        self.write( json.dumps( str(user.get_user_blob()) ) )
 
     def put(self):
         user = self.get_authenticated_user()
         if user == None:
             return
 
-        user_data = json.loads(self.request.body)
+        user_data = json.loads(str(self.request.body))
 
         # Mass assignment is dangerous mmk
         allowed_attributes = ["pgp_key", "full_name", "email", "password", "email_enabled", "chainload_uri", "page_collection_paths_list" ]
@@ -294,18 +302,20 @@ class UserInformationHandler(BaseHandler):
             self.logit( "User just updated their profile information." )
             return_data["success"] = True
 
-        self.write( json.dumps( return_data ) )
+        self.write( json.dumps( str(return_data) ) )
 
 def authenticate_user( request_handler, in_username ):
     user = session.query( User ).filter_by( username=in_username ).first()
 
     csrf_token = binascii.hexlify( os.urandom( 50 ) )
-    request_handler.set_secure_cookie( "user", user.id, httponly=True )
-    request_handler.set_secure_cookie( "csrf", csrf_token, httponly=True )
+
+    request_handler.set_secure_cookie( "user", str(user.id), httponly=True )
+    request_handler.set_secure_cookie( "csrf", str(csrf_token), httponly=True )
     request_handler.write(json.dumps({
         "success": True,
-        "csrf_token": csrf_token,
+        "csrf_token": str(csrf_token)
     }))
+
 
 class RegisterHandler(BaseHandler):
     @gen.coroutine
@@ -398,18 +408,18 @@ class CallbackHandler(BaseHandler):
             self.throw_404()
             return
 
-        if "-----BEGIN PGP MESSAGE-----" in self.request.body:
+        if "-----BEGIN PGP MESSAGE-----" in str(self.request.body):
             if owner_user.email_enabled:
                 self.logit( "User " + owner_user.username + " just got a PGP encrypted XSS callback, passing it along." )
-                send_javascript_pgp_encrypted_callback_message( self.request.body, owner_user.email )
+                send_javascript_pgp_encrypted_callback_message( str(self.request.body), owner_user.email )
         else:
             callback_data = json.loads( self.request.body )
             callback_data['ip'] = self.request.remote_ip
             injection_db_record = record_callback_in_database( callback_data, self )
             self.logit( "User " + owner_user.username + " just got an XSS callback for URI " + injection_db_record.vulnerable_page )
-
-            if owner_user.email_enabled:
-                send_javascript_callback_message( owner_user.email, injection_db_record )
+            self.logit(owner_user.email)
+            #if owner_user.email_enabled:
+            send_javascript_callback_message( owner_user.email, injection_db_record )
             self.write( '{}' )
 
 class HomepageHandler(BaseHandler):

@@ -8,7 +8,7 @@ import re
 class User(Base):
     __tablename__ = 'users'
 
-    id = Column(String(100), primary_key=True)
+    id = Column(LargeBinary, primary_key=True) # needs to be bytea
     full_name = Column(String(120))
     username = Column(String(80))
     password = Column(String(120))
@@ -19,7 +19,7 @@ class User(Base):
     is_premium = Column(Boolean())
     email_enabled = Column(Boolean())
     chainload_uri = Column(Text())
-    owner_correlation_key = Column(String(100))
+    owner_correlation_key = Column(String(250)) #this pribably needs to be bytea as well
     page_collection_paths_list = Column(Text()) # Done this way to allow users to just paste and share relative page lists
 
     def __init__( self ):
@@ -123,22 +123,22 @@ class User(Base):
         return return_dict
 
     def generate_user_id( self ):
-        self.id = binascii.hexlify(os.urandom(50))
+        self.id = binascii.hexlify(os.urandom(50)).decode()
 
     def generate_password_reset_key( self ):
-        self.password_reset_token = binascii.hexlify(os.urandom(60))
+        self.password_reset_token = binascii.hexlify(os.urandom(60)).decode()
 
     def generate_owner_correlation_key( self ):
-        self.owner_correlation_key = binascii.hexlify(os.urandom(50))
+        self.owner_correlation_key = binascii.hexlify(os.urandom(50)).decode()
 
     def compare_password( self, in_password ):
-        return ( bcrypt.hashpw( str( in_password.encode( 'utf-8' ) ), str( self.password.encode( 'utf-8' ) ) ) == self.password )
+        return ( bcrypt.hashpw( str( in_password ), str( self.password )) == self.password )
 
     def update( self ):
         session.commit()
 
     def _get_bcrypt_hash( self, input_string ):
-        return bcrypt.hashpw( str( input_string ), bcrypt.gensalt( 10 ) )
+        return bcrypt.hashpw( str(input_string), bcrypt.gensalt( 10 ) )
 
     def __str__(self):
         return self.username + " - ( " + self.full_name + " )"
